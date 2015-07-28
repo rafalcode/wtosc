@@ -1,0 +1,121 @@
+ ref. http://www.math.niu.edu/~rusin/uses-math/music/frequencieso
+
+unfortunately this is just the 12th root of c trick.
+
+Here are the frequencies for the 88 notes on a piano, assuming the
+A above middle C has been tuned to a frequency of  440 Hz.
+This is a very trivial table! Each one of the numbers here is
+larger than the one before it by the same ratio (the twelfth root of 2,
+which is 1.059463094359295264561825294946341700779204317494...  .
+Approximately.)
+
+Note  Frequency
+A_    27.500000000000000
+A#    29.135235094880619
+B_    30.867706328507756
+C_    32.703195662574829
+C#    34.647828872109012
+D_    36.708095989675945
+D#    38.890872965260113
+E_    41.203444614108741
+F_    43.653528929125485
+F#    46.249302838954299
+G_    48.999429497718661
+G#    51.913087197493142
+A_    55.000000000000000
+A#    58.270470189761239
+B_    61.735412657015513
+C_    65.406391325149658
+C#    69.295657744218024
+D_    73.416191979351890
+D#    77.781745930520227
+E_    82.406889228217482
+F_    87.307057858250971
+F#    92.498605677908599
+G_    97.998858995437323
+G#   103.826174394986284
+A_   110.000000000000000
+A#   116.540940379522479
+B_   123.470825314031027
+C_   130.812782650299317
+C#   138.591315488436048
+D_   146.832383958703780
+D#   155.563491861040455
+E_   164.813778456434964
+F_   174.614115716501942
+F#   184.997211355817199
+G_   195.997717990874647
+G#   207.652348789972569
+A_   220.000000000000000
+A#   233.081880759044958
+B_   246.941650628062055
+C_   261.625565300598634   This is "middle C"
+C#   277.182630976872096
+D_   293.664767917407560
+D#   311.126983722080910
+E_   329.627556912869929
+F_   349.228231433003884
+F#   369.994422711634398
+G_   391.995435981749294
+G#   415.304697579945138
+A_   440.000000000000000
+A#   466.163761518089916
+B_   493.883301256124111
+C_   523.251130601197269
+C#   554.365261953744192
+D_   587.329535834815120
+D#   622.253967444161821
+E_   659.255113825739859
+F_   698.456462866007768
+F#   739.988845423268797
+G_   783.990871963498588
+G#   830.609395159890277
+A_   880.000000000000000
+A#   932.327523036179832
+B_   987.766602512248223
+C_  1046.502261202394538
+C#  1108.730523907488384
+D_  1174.659071669630241
+D#  1244.507934888323642
+E_  1318.510227651479718
+F_  1396.912925732015537
+F#  1479.977690846537595
+G_  1567.981743926997176
+G#  1661.218790319780554
+A_  1760.000000000000000
+A#  1864.655046072359665
+B_  1975.533205024496447
+C_  2093.004522404789077
+C#  2217.461047814976769
+D_  2349.318143339260482
+D#  2489.015869776647285
+E_  2637.020455302959437
+F_  2793.825851464031075
+F#  2959.955381693075191
+G_  3135.963487853994352
+G#  3322.437580639561108
+A_  3520.000000000000000
+A#  3729.310092144719331
+B_  3951.066410048992894
+C_  4186.009044809578154
+
+Let me fire off a few comments about frequencies for comparison --
+
+1. AC power circuits in most countries oscillate voltages at a frequency
+of 50 Hz or 60 Hz. Occasionally some faulty circuitry will hum or buzz
+at this frequency at a consequence.
+
+2. Dancer Michael Flatley's dancing feet have been clocked at 28 taps per
+second (28 Hz). Oscillations in the low dozens of Hertz can be distinctly
+heard as "sputtering" noises. Oscillations with lower frequencies sound
+more like "wah-wah-wah" rhythms.
+
+3. Human hearing can still detect sound in the low 10s of thousands of
+Hertz (varying by individual, and decreasing with age). Dog can hear
+at least an octave higher and these are the pitches used by dog whistles.
+
+Look on the web for more detailed (and accurate) information about
+frequencies, oscillations, and simple harmonic motion.
+
+This is
+   http://www.math.niu.edu/~rusin/uses-math/music/frequencies
