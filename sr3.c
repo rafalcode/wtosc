@@ -15,7 +15,7 @@
 #define SRATE 44100.0
 #define NUMNOTES 8
 
-struct svals_t
+struct svals_t /* a struct with 2 floats: assocfl, and sonicv */
 {
     float assocfl; /* float associated with this */
     float sonicv; /* sonic value */
@@ -44,13 +44,13 @@ struct s_r_n /* short int ring node struct: not typedef'd */
     struct s_r_n *nx;
 };
 
-typedef struct
+typedef struct /* sr_t, a struct to hold a s_r_n */
 {
     struct s_r_n *sr;
     unsigned sz;
 } sr_t;
 
-typedef struct
+typedef struct /* WAV hdr struct */
 {
     char id[4]; // should always contain "RIFF"
     int glen;    // general length: total file length minus 8, could because the types so far seen (id and glen itself) are actually 8 bytes
@@ -77,7 +77,7 @@ wh_t *hdr4chunk(int sfre, char nucha, int numsamps) /* a header for a file chunk
     wh->nchans=nucha; /* this fed in */
     wh->sampfq=sfre; /* fed in to function */
 
-    wh->bipsamp=16; /* shorts */
+    wh->bipsamp=16; /* hard-coded to shorts, no 24bit here */
     wh->bypc=wh->bipsamp/8;
     wh->byid=numsamps*wh->nchans*wh->bypc;
 
@@ -102,7 +102,7 @@ srn_t *creasrn0(unsigned ssz) /* create empty ring of size ssz */
     return mou;
 }
 
-srn_t *creasrn(unsigned ssz, short uniformval) /* create empty ring of size ssz */
+srn_t *creasrn(unsigned ssz, short uniformval) /* create empty ring of size ssz, with s-member being initialised */
 {
     int i;
     srn_t *mou /* mouth with a tendency to eat the tail*/, *ttmp /* type temporary */;
@@ -184,27 +184,32 @@ short *prtimesring2a(srn_t *mou, unsigned ntimes)
 int main(int argc, char *argv[])
 {
     if(argc != 3) {
-        printf("Testing a short integer ring, 1) number of samples, i.e. 44100 for a second, etc. 2) output wav\n");
+        printf("Testing a short integer ring, 1) number of seconds, will be multiplied by 44100 to get samples 2) output wav\n");
         exit(EXIT_FAILURE);
     }
     int i;
-    unsigned soulen=atoi(argv[1]); /* length of sound, in samples! */
+    unsigned sndlen=44100*atoi(argv[1]); /* length of sound, in samples! */
 
     float fqa[NUMNOTES]={60., 110., 220.25, 330.5, 441., 551.25, 2300., 5000.};
+
+    /* setting up the wavetable */
     wavt_t *wt=malloc(sizeof(wavt_t));
     wt->fsamps=SRATE/fqa[2]; /* number of samples available for each wavelngth at this frequency. As a float */
     wt->nsamps=(unsigned)(.5+wt->fsamps); /* above as an unsigned int */
     wt->d=malloc(wt->nsamps*sizeof(struct svals_t));
     wt->svalranges=malloc((wt->nsamps-1)*sizeof(struct svals_t));
-    wt->incs=2.*M_PI/wt->fsamps;
+    wt->incs=2.*M_PI/wt->fsamps; /* distance in radians btwn each sampel int he wavelength */
     /* OK create the wavetable */
     wt->d[0].assocfl = 0.;
     wt->d[0].sonicv=AMPL*sin(wt->d[0].assocfl);
     for(i=1;i<wt->nsamps;++i) {
         wt->d[i].assocfl =wt->incs*i;
+        /* this is the key value allocation ... in this case, as it's a sine wave, it's easy */
         wt->d[i].sonicv=AMPL*sin(wt->d[i].assocfl);
-        wt->svalranges[i-1]= wt->d[i].sonicv - wt->d[i-1].sonicv;
+        wt->svalranges[i-1]= wt->d[i].sonicv - wt->d[i-1].sonicv; /* the difference with the previous value, used for interpolating */
     }
+    /* so out wavetable has been created, as you'll note it only has accurately representative values for one frequency,
+     * but we're still going to use for other frequencies */
 
     float nsamps;
     unsigned insamps;
@@ -218,42 +223,43 @@ int main(int argc, char *argv[])
     float kincs, xprop;
 
     for(m=0;i<NUMNOTES;++i) { /* loop for other frequencies */
-    nsamps=SRATE/fqa[m];
-    insamps=(unsigned)(.5+nsamps);
-    srn_t *m=creasrn0(insamps);
-    tsrn=m;
-    float incs=2.*M_PI/nsamps;
+        nsamps=SRATE/fqa[m];
+        insamps=(unsigned)(.5+nsamps); /* integer rendering of above */
+        srn_t *m=creasrn0(insamps);
+        tsrn=m;
+        float incs=2.*M_PI/nsamps;
 
-    /* the following now, must catch the right indices in the wavtable that this frequency is aossicated with */
-    int j, k=0;
-    float kincs, xprop;
-    for(i=0;i<nsamps;++i) { /* will assign to both an arrya and a short it ring */
-        kincs=incs*i;
-        for(j=k; j<wt->nsamps; ++j)
-            if(kincs>=wt->d[j].assocfl)
-                continue;
-            else
-                break;
-        k=j-1;
-        xprop=(kincs-wt->d[k].assocfl)/incs;
-        tsrn->s=(short)(.5+wt->d[k].sonicv + xprop*wt->svalranges[k]);
-        tsrn=tsrn->nx;
-    } /*seems to work */
+        /* the following now, must catch the right indices in the wavtable that this frequency is aossicated with */
+        int j, k=0;
+        float kincs, xprop;
+        for(i=0;i<nsamps;++i) { /* will assign to both an arrya and a short it ring */
+            kincs=incs*i;
+            for(j=k; j<wt->nsamps; ++j)
+                if(kincs>=wt->d[j].assocfl)
+                    continue;
+                else
+                    break;
+            /* for the first value of lower frequency this next could rende k as -1 .. watch it */
+            k=j-1; /* this is the index corresponding to the modelfreq, after which this new frequency's value must be modelled */
+            xprop=(kincs-wt->d[k].assocfl)/incs;
+            tsrn->s=(short)(.5+wt->d[k].sonicv + xprop*wt->svalranges[k]);
+            tsrn=tsrn->nx;
+        } /*seems to work */
 
-    short *sbuf=prtimesring2a(m, NUMNOTES*soulen); /* nsamps are looped over to produce soulen's worth */
-    wh_t *hdr=hdr4chunk((int)SRATE, 1, NUMNOTES*soulen);
+        short *sbuf=prtimesring2a(m, NUMNOTES*sndlen); /* nsamps are looped over to produce sndlen's worth */
+        wh_t *hdr=hdr4chunk((int)SRATE, 1, NUMNOTES*sndlen);
 
-    FILE *fout=fopen(argv[2], "wb");
-    fwrite(hdr, sizeof(char), 44, fout);
-    fwrite(sbuf, sizeof(short), soulen, fout);
-    fclose(fout);
+        FILE *fout=fopen(argv[2], "wb");
+        fwrite(hdr, sizeof(char), 44, fout);
+        fwrite(sbuf, sizeof(short), sndlen, fout);
+        fclose(fout);
 
-    free(hdr);
-    free(sbuf);
-    free(wt->svalranges);
-    free(wt->d);
-    free(wt);
-    freering(m);
+        free(hdr);
+        free(sbuf);
+        free(wt->svalranges);
+        free(wt->d);
+        free(wt);
+        freering(m);
 
-    return 0;
-}
+        return 0;
+    }
