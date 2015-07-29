@@ -16,18 +16,18 @@ struct s_r_n /* short int ring node */
 };
 typedef struct s_r_n srn_t;
 
-srn_t *creasrn(unsigned ssz) /* create empty ring of size ssz */
+srn_t *creasrn(unsigned ssz) /* create ring of size ssz, random values will be assigned to members of the ring */
 {
     int i;
     srn_t *mou /* mouth with a tendency to eat the tail*/, *ttmp /* type temporary */;
 
     mou=malloc(sizeof(srn_t));
-    mou->s=0;
+    mou->s=rand();
     mou->nx=NULL;
     ttmp=mou;
     for(i=1;i<ssz;++i) {
         ttmp->nx=malloc(sizeof(srn_t));
-        ttmp->nx->s=i;
+        ttmp->nx->s=rand();
         ttmp=ttmp->nx; /* with ->nmove on */
     }
     ttmp->nx=mou;
@@ -72,7 +72,8 @@ void freering(srn_t *mou)
 int main(int argc, char *argv[])
 {
     if(argc != 3) {
-        printf("Testing a short integer ring, Please give size of ring and the total number of values you want generated loopwise on the ring\n");
+        printf("Usage: program to test a ring of integers\n");
+        printf("Arguments: 1) size of the ring 2) number of values required from ring (values will cycle through ring).\n");
         exit(EXIT_FAILURE);
     }
     srn_t *m=creasrn(atoi(argv[1]));

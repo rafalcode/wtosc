@@ -13,6 +13,8 @@
 #define MAXSHORT 0x7FFF
 #define AMPL 1.0*MAXSHORT
 #define SRATE 44100.0
+#define ISRATE 44100 /* integer version */
+#define A440 440
 
 typedef struct
 {
@@ -158,15 +160,16 @@ short *prtimesring2a(srn_t *mou, unsigned ntimes)
 
 int main(int argc, char *argv[])
 {
-    if(argc != 3) {
-        printf("Testing a short integer ring, 1) number of samples, i.e. 44100 for a second, etc. 2) output wav\n");
+    if(argc != 4) {
+        printf("Program to issue a note via wavetable synthesis. The primary wavetable is calculated using A440.\n");
+        printf("Wav table produced will be mono and at the standard 44100Hz sampling rate.\n");
+        printf("Usage: 3 arguments: 1) floating pt frequency value 2) seconds' duration  2) output wavfle name.\n");
         exit(EXIT_FAILURE);
     }
     int i;
-    unsigned soulen=atoi(argv[1]); /* length of sound, in samples! */
+    unsigned soulen=atoi(argv[2])*ISRATE; /* length of sound, in samples! */
 
-    float fqa[]={60., 110., 220.25, 330.5, 441., 551.25, 2300., 5000.};
-    float wtsamps=SRATE/fqa[2];
+    float wtsamps=SRATE/A440;
     int iwtsamps=(unsigned)(.5+wtsamps); /* integer number of samples for our wavetable */
     wavt_t *wt=malloc(iwtsamps*sizeof(wavt_t));
     float incs=2.*M_PI/wtsamps; /* the inrement size ... yes it can be a float */
@@ -177,7 +180,7 @@ int main(int argc, char *argv[])
     }
 
     /* Another frequency */
-    float nsamps=SRATE/fqa[7];
+    float nsamps=SRATE/atof(argv[1]);
     unsigned insamps=(unsigned)(.5+nsamps);
     srn_t *m=creasrn0(insamps);
     srn_t *tsrn=m;
@@ -202,7 +205,7 @@ int main(int argc, char *argv[])
     short *sbuf=prtimesring2a(m, soulen); /* nsamps are looped over to produce soulen's worth */
     wh_t *hdr=hdr4chunk((int)SRATE, 1, soulen);
 
-    FILE *fout=fopen(argv[2], "wb");
+    FILE *fout=fopen(argv[3], "wb");
     fwrite(hdr, sizeof(char), 44, fout);
     fwrite(sbuf, sizeof(short), soulen, fout);
     fclose(fout);
