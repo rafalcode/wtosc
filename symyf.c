@@ -14,7 +14,7 @@
 #define AMPL 1.0*MAXSHORT
 #define SRATE 44100.0
 #define ISRATE 44100 /* integer version */
-#define A440 440
+#define A440 440.
 
 typedef struct
 {
@@ -163,19 +163,19 @@ int main(int argc, char *argv[])
     if(argc != 4) {
         printf("Program to issue a note via wavetable synthesis. The primary wavetable is calculated using A440.\n");
         printf("Wav table produced will be mono and at the standard 44100Hz sampling rate.\n");
-        printf("Usage: 3 arguments: 1) floating pt frequency value 2) seconds' duration  2) output wavfle name.\n");
+        printf("Usage: 3 arguments: 1) floating pt frequency value 2) seconds' duration (fp fine) 3) output wavfle name.\n");
         exit(EXIT_FAILURE);
     }
     int i;
-    unsigned soulen=atoi(argv[2])*ISRATE; /* length of sound, in samples! */
+    unsigned soulen=(unsigned)(.5+atof(argv[2])*SRATE); /* length of sound, in samples! */
 
     float wtsamps=SRATE/A440;
-    int iwtsamps=(unsigned)(.5+wtsamps); /* integer number of samples for our wavetable */
+    unsigned iwtsamps=(unsigned)(.5+wtsamps); /* integer number of samples for our wavetable */
     wavt_t *wt=malloc(iwtsamps*sizeof(wavt_t));
-    float incs=2.*M_PI/wtsamps; /* the inrement size ... yes it can be a float */
+    float wtstpsz=2.*M_PI/wtsamps; /* the increment size ... yes it can be a float */
     /*OK create the wavetable */
-    for(i=0;i<wtsamps;++i) {
-        wt[i].assocfl =incs*i;
+    for(i=0;i<iwtsamps;++i) {
+        wt[i].assocfl =wtstpsz*i;
         wt[i].sonicv=AMPL*sin(wt[i].assocfl);
     }
 
@@ -184,23 +184,23 @@ int main(int argc, char *argv[])
     unsigned insamps=(unsigned)(.5+nsamps);
     srn_t *m=creasrn0(insamps);
     srn_t *tsrn=m;
-    incs=2.*M_PI/nsamps;
+    float stpsz=2.*M_PI/((float)insamps); /* here we recognise that insamps is a different number to nsamps */
 
-    /* the following now, must catch the right indices in the wavtable that this frequency is aossicated with */
     int j, k=0;
     float kincs, xprop;
-    for(i=0;i<nsamps;++i) { /* will assign to both an arrya and a short it ring */
-        kincs=incs*i;
-        for(j=k; j<iwtsamps; ++j)
+    for(i=0;i<insamps;++i) {
+        kincs=stpsz*i;
+        for(j=k; j<iwtsamps-1; ++j)
             if(kincs>=wt[j].assocfl)
                 continue;
             else
                 break;
         k=j-1;
-        xprop=(kincs-wt[k].assocfl)/(wt[j].assocfl-wt[k].assocfl);
+        // xprop=(kincs-wt[k].assocfl)/(wt[j].assocfl-wt[k].assocfl);
+        xprop=(kincs-wt[k].assocfl)/wtstpsz;
         tsrn->s=(short)(.5+wt[k].sonicv + xprop*(wt[j].sonicv-wt[k].sonicv));
         tsrn=tsrn->nx;
-    } /*seems to work */
+    }
 
     short *sbuf=prtimesring2a(m, soulen); /* nsamps are looped over to produce soulen's worth */
     wh_t *hdr=hdr4chunk((int)SRATE, 1, soulen);

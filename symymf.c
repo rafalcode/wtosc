@@ -26,29 +26,22 @@ typedef struct /* wavt_t */
     struct svals_t *d;
     float *svalranges;
     float fsamps;
-    float incs;
     unsigned nsamps;
+    float stpsz;
 } wavt_t;
-
-typedef struct /* synfq_t: the synthesized frequency */
-{
-    struct svals_t *d;
-    float fsamps;
-    float kincs;
-    unsigned nsamps;
-} synfq_t;
 
 struct s_r_n /* short int ring node struct: not typedef'd */
 {
     short s;
     struct s_r_n *nx;
 };
+typedef struct s_r_n sr_t;
 
-typedef struct /* sr_t, a struct to hold a s_r_n */
+typedef struct /* srp_t, a struct to hold a ptr to s_r_n and its size */
 {
-    struct s_r_n *sr;
+    sr_t *sr;
     unsigned sz;
-} sr_t;
+} srp_t;
 
 typedef struct /* WAV hdr struct */
 {
@@ -86,43 +79,25 @@ wh_t *hdr4chunk(int sfre, char nucha, int numsamps) /* a header for a file chunk
     return wh;
 }
 
-srn_t *creasrn0(unsigned ssz) /* create empty ring of size ssz */
+sr_t *creasrn0(unsigned ssz) /* create empty ring of size ssz */
 {
     int i;
-    srn_t *mou /* mouth with a tendency to eat the tail*/, *ttmp /* type temporary */;
+    sr_t *mou /* mouth with a tendency to eat the tail*/, *ttmp /* type temporary */;
 
-    mou=malloc(sizeof(srn_t));
+    mou=malloc(sizeof(sr_t));
     mou->nx=NULL;
     ttmp=mou;
     for(i=1;i<ssz;++i) {
-        ttmp->nx=malloc(sizeof(srn_t));
+        ttmp->nx=malloc(sizeof(sr_t));
         ttmp=ttmp->nx; /* with ->nmove on */
     }
     ttmp->nx=mou;
     return mou;
 }
 
-srn_t *creasrn(unsigned ssz, short uniformval) /* create empty ring of size ssz, with s-member being initialised */
+void prtring(sr_t *mou)
 {
-    int i;
-    srn_t *mou /* mouth with a tendency to eat the tail*/, *ttmp /* type temporary */;
-
-    mou=malloc(sizeof(srn_t));
-    mou->s=0;
-    mou->nx=NULL;
-    ttmp=mou;
-    for(i=1;i<ssz;++i) {
-        ttmp->nx=malloc(sizeof(srn_t));
-        ttmp->nx->s=uniformval;
-        ttmp=ttmp->nx; /* with ->nmove on */
-    }
-    ttmp->nx=mou;
-    return mou;
-}
-
-void prtring(srn_t *mou)
-{
-    srn_t *st=mou;
+    sr_t *st=mou;
     do {
         printf("%d ", st->s);
         st=st->nx;
@@ -131,10 +106,10 @@ void prtring(srn_t *mou)
     return;
 }
 
-void prtimesring(srn_t *mou, unsigned ntimes)
+void prtimesring(sr_t *mou, unsigned ntimes)
 {
     unsigned i=0;
-    srn_t *st=mou;
+    sr_t *st=mou;
     do {
         printf("%d ", st->s);
         st=st->nx;
@@ -144,10 +119,10 @@ void prtimesring(srn_t *mou, unsigned ntimes)
     return;
 }
 
-void freerestring(srn_t *lastmou, unsigned numrest) /* free the rest of the ring .. but what happens if we eant to maeke it begger? */
+void freerestring(sr_t *lastmou, unsigned numrest) /* free the rest of the ring .. but what happens if we eant to maeke it begger? */
 {
     unsigned i=0;
-    srn_t *st=lastmou->nx, *nxt;
+    sr_t *st=lastmou->nx, *nxt;
     while(i<numrest) {
         nxt=st->nx; /* we store the nx of this nx */
         free(st); /* now we can delete it */
@@ -157,9 +132,9 @@ void freerestring(srn_t *lastmou, unsigned numrest) /* free the rest of the ring
     lastmou->nx=st;
 }
 
-void freering(srn_t *mou)
+void freering(sr_t *mou)
 {
-    srn_t *st=mou->nx, *nxt;
+    sr_t *st=mou->nx, *nxt;
     while (st !=mou) {
         nxt=st->nx; /* we store the nx of this nx */
         free(st); /* now we can delete it */
@@ -168,19 +143,19 @@ void freering(srn_t *mou)
     free(mou);
 }
 
-short *prtimesring2a(srn_t **dwta, unsigned *insamps, unsigned ntimes, unsigned nnotes)
+short *prtimesring2a(srp_t *sra, unsigned nnotes, unsigned ntimes)
 {
-    unsigned i=0;
+    unsigned i=0, ii, j;
     short *sbuf=malloc(ntimes*nnotes*sizeof(short));
-    srn_t *st;
+    sr_t *st;
     for(j=0;j<nnotes;++j) {
         ii=0;
-        st=dwta[j];
+        st=sra[j].sr;
         do {
-            sbuf[i]=st->s;
+            sbuf[i++]=st->s;
             st=st->nx;
-            i++;
-        } while (i !=ntimes);
+            ii++;
+        } while (ii !=ntimes);
     }
     return sbuf;
 }
@@ -194,7 +169,7 @@ int main(int argc, char *argv[])
     int i;
     unsigned sndlen=44100*atoi(argv[1]); /* length of sound, for each notes: NUMNOTES of these will be generated */
 
-    float fqa[NUMNOTES]={60., 110., 220.25, 330.5, 441., 551.25, 2300., 5000.};
+    float fqa[NUMNOTES]={160., 220.25, 330.5, 441., 551.25, 800., 1200., 2300.};
 
     /* setting up the "model wavetable" */
     wavt_t *wt=malloc(sizeof(wavt_t));
@@ -202,56 +177,50 @@ int main(int argc, char *argv[])
     wt->nsamps=(unsigned)(.5+wt->fsamps); /* above as an unsigned int */
     wt->d=malloc(wt->nsamps*sizeof(struct svals_t));
     wt->svalranges=malloc((wt->nsamps-1)*sizeof(struct svals_t));
-    wt->incs=2.*M_PI/wt->fsamps; /* distance in radians btwn each sampel int he wavelength */
+    wt->stpsz=2.*M_PI/((float)wt->nsamps); /* distance in radians btwn each sampel int he wavelength */
     /* OK create the wavetable */
     wt->d[0].assocfl = 0.;
     wt->d[0].sonicv=AMPL*sin(wt->d[0].assocfl);
     for(i=1;i<wt->nsamps;++i) {
-        wt->d[i].assocfl =wt->incs*i;
+        wt->d[i].assocfl =wt->stpsz*i;
         /* this is the key value allocation ... in this case, as it's a sine wave, it's easy */
         wt->d[i].sonicv=AMPL*sin(wt->d[i].assocfl);
         wt->svalranges[i-1]= wt->d[i].sonicv - wt->d[i-1].sonicv; /* the difference with the previous value, used for interpolating */
     }
-    /* so out wavetable has been created, as you'll note it only has accurately representative values for one frequency,
+    /* so our wavetable has been created, as you'll note it only has accurately representative values for one frequency,
      * but we're still going to use for other frequencies */
 
-    float nsamps;
-    unsigned insamps[NUMNOTES];
-    srn_t *m;
-    srn_t *tsrn;
-    short *sbuf;
-    float incs;
+    float fsamps;
+    sr_t *tsr;
+    float stpsz;
 
-    /* the following now, must catch the right indices in the wavtable that this frequency is aossicated with */
     int j, k=0, m;
     float kincs, xprop;
 
-    srn_t **dwta=malloc(NUMNOTES*sizeof(srn_t*)); /* derived wavetable array */
-    for(m=0;m<NUMNOTES;++m) { /* loop for other frequencmes */
-        nsamps=SRATE/fqa[m];
-        insamps[m]=(unsigned)(.5+nsamps); /* integer rendering of above */
-        dwta[m]=creasrn0(insamps[m]);
-        tsrn=dwta[m];
-        incs=2.*M_PI/nsamps;
+    srp_t *sra=malloc(NUMNOTES*sizeof(srp_t)); /* array of rings */
+    for(m=0;m<NUMNOTES;++m) { /* loop for our frequency range */
+        fsamps=SRATE/fqa[m];
+        sra[m].sz=(unsigned)(.5+fsamps);
+        sra[m].sr=creasrn0(sra[m].sz);
+        tsr=sra[m].sr;
+        stpsz=2.*M_PI/((float)sra[m].sz);
 
-        /* the following now, must catch the right indices in the wavtable that this frequency is aossicated with */
-        for(i=0;i<nsamps;++i) { /* will assign to both an arrya and a short it ring */
-            kincs=incs*i;
-            for(j=k; j<wt->nsamps; ++j)
+        for(i=0;i<sra[m].sz;++i) {
+            kincs=stpsz*i;
+            for(j=k; j<wt->nsamps-1; ++j) /* here we cycle through the model wavetable samplepoints */
                 if(kincs>=wt->d[j].assocfl) /* d[0].assocfl always zero, so the next "continue" will alwsays increment j to 1, even if k=0 */
                     continue;
                 else
                     break;
-            /* for the first value of lower frequency this next could render k as -1 .. watch it */
-            k=j-1; /* this is the index corresponding to the modelfreq, after which this new frequency's value must be modelled */
-            xprop=(kincs-wt->d[k].assocfl)/incs;
-            tsrn->s=(short)(.5+wt->d[k].sonicv + xprop*wt->svalranges[k]);
-            tsrn=tsrn->nx;
-        } /*seems to work */
+            k=j-1; /* edge condition of k watched, the above continue will ensure it's never zero */
+            xprop=(kincs-wt->d[k].assocfl)/wt->stpsz;
+            tsr->s=(short)(.5+wt->d[k].sonicv + xprop*wt->svalranges[k]);
+            tsr=tsr->nx;
+        }
     }
 
     short *sbuf; /* our sound info buffer */
-    sbuf=prtimesring2a(m, sndlen, insamps, NUMNOTES); /* nsamps are looped over to produce sndlen's worth */
+    sbuf=prtimesring2a(sra, NUMNOTES, sndlen); /* nsamps are looped over to produce sndlen's worth */
     wh_t *hdr=hdr4chunk((int)SRATE, 1, NUMNOTES*sndlen);
     FILE *fout=fopen(argv[2], "wb");
     fwrite(hdr, sizeof(char), 44, fout);
@@ -263,7 +232,9 @@ int main(int argc, char *argv[])
     free(wt->svalranges);
     free(wt->d);
     free(wt);
-    freering(m);
+    for(i=0;i<NUMNOTES;++i) 
+        freering(sra[i].sr);
+    free(sra);
 
     return 0;
 }
