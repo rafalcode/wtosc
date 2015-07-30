@@ -13,5 +13,7 @@ This approach of using frequency to serve as model for arbitrary frequencies is 
 ## Appropriateness of computer implementation
 In quite convenient fashion, the wavetable approach turns out to be ideal for a computer implementation. If the sample values are arranged in a ring structure, whereby jumping from the last samplepoint leads directly to the first samplepoint, the computer will happily cycle through the ring repeatedly, until a certain time limit is reached. As described this circular looping renders the computer becomes a natural sound synthesiser.
 
-## Interpolation
-As mentioned, in this code we are taking the easiest interpolation scheme which is the linear one.
+# Programs
+* symyf: compile with "make symyf" proof-of-concept wavetable. One sinewave frequency synthesised to a wav file.
+* symymf: compile with "make symymf" Eight frequencies sythesised from a sine wavetable
+* wsymymf: compile with "make wsymymf". Allows waveform to be sampled from a wavfile at a certain point. Eight frequencies sythesised.
