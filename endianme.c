@@ -4,10 +4,11 @@
 int main(int argc, char *argv[])
 {
     int num = 1;
-    if(*(char *)&num == 1)
-        printf("Your is an little-endian environment.\n");
-    else
-        printf("Your encvironment is big-endian\n");
+    if(*(char *)&num == 1) {
+        printf("Yours is an little-endian environment.\n");
+        printf("WHich means that the first byte is the least significant figure.\n");
+    } else
+        printf("Yours encvironment is big-endian\n");
     return 0;
 }
 

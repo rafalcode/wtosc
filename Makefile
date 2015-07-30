@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-g -Wall
 
-EXECUTABLES=symyf symyf
+EXECUTABLES=symyf symymf wsymymf
 
 # symyf: SYnthesise MY Frequency. Accepts a frequency vlaue on the command line, and synthesizes a sine wave on it, using a wavetable.
 symyf: symyf.c
@@ -12,6 +12,14 @@ symyf: symyf.c
 # there's an extra useful data struct in this one, an srp_t, which is a point to ring struct, with an added sz value.
 # indicating the number of sample points in the ring.
 symymf: symymf.c
+	${CC} ${CFLAGS} $^ -o $@
+
+# prototype for reading in a data from a wav file from a certain time point: used later in wsymymf.c
+samh: samh.c
+	${CC} ${CFLAGS} $^ -o $@
+
+# wsymymf: the extra w here is for WAV. The idea is to populate the wavetable from samples in a wav file
+wsymymf: wsymymf.c
 	${CC} ${CFLAGS} $^ -o $@
 
 .PHONY: clean
