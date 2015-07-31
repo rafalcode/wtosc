@@ -16,15 +16,21 @@
 #define ISRATE 44100 /* integer version */
 #define A440 440.
 
-typedef struct
+typedef struct /* type wav_t ... one element of a wavetable: for full wave table you need an array of these */
 {
     float assocfl; /* float associated with this */
-    float sonicv; /* sonic value */
+    union {
+        float sonicv; /* sonic value */
+        float sonica[2];
+    } sv;
 } wavt_t;
 
 struct s_r_n /* short int ring node */
 {
-    short s;
+    union {
+        short s;
+        short sa[2];
+    } sv;
     struct s_r_n *nx;
 };
 typedef struct s_r_n srn_t;
@@ -63,7 +69,7 @@ wh_t *hdr4chunk(int sfre, char nucha, int numsamps) /* a header for a file chunk
     return wh;
 }
 
-srn_t *creasrn0(unsigned ssz) /* create empty ring of size ssz */
+srn_t *creasrn0(unsigned ssz) /* create empty ring of size ssz, ncha not required because of struct has a union */
 {
     int i;
     srn_t *mou /* mouth with a tendency to eat the tail*/, *ttmp /* type temporary */;
@@ -73,47 +79,35 @@ srn_t *creasrn0(unsigned ssz) /* create empty ring of size ssz */
     ttmp=mou;
     for(i=1;i<ssz;++i) {
         ttmp->nx=malloc(sizeof(srn_t));
-        ttmp=ttmp->nx; /* with ->nmove on */
+        ttmp=ttmp->nx;
     }
     ttmp->nx=mou;
     return mou;
 }
 
-srn_t *creasrn(unsigned ssz, short uniformval) /* create empty ring of size ssz */
-{
-    int i;
-    srn_t *mou /* mouth with a tendency to eat the tail*/, *ttmp /* type temporary */;
-
-    mou=malloc(sizeof(srn_t));
-    mou->s=0;
-    mou->nx=NULL;
-    ttmp=mou;
-    for(i=1;i<ssz;++i) {
-        ttmp->nx=malloc(sizeof(srn_t));
-        ttmp->nx->s=uniformval;
-        ttmp=ttmp->nx; /* with ->nmove on */
-    }
-    ttmp->nx=mou;
-    return mou;
-}
-
-void prtring(srn_t *mou)
+void prtring(srn_t *mou, short ncha)
 {
     srn_t *st=mou;
     do {
-        printf("%d ", st->s);
+        if(ncha==2)
+            printf("%d:%d ", st->sv.sa[0], st->sv.sa[1]);
+        else if(ncha==1)
+            printf("%d ", st->sv.s);
         st=st->nx;
     } while (st !=mou);
     putchar('\n');
     return;
 }
 
-void prtimesring(srn_t *mou, unsigned ntimes)
+void prtimesring(srn_t *mou, unsigned ntimes, short ncha)
 {
     unsigned i=0;
     srn_t *st=mou;
     do {
-        printf("%d ", st->s);
+        if(ncha==2)
+            printf("%d:%d ", st->sv.sa[0], st->sv.sa[1]);
+        else if(ncha==1)
+            printf("%d ", st->sv.s);
         st=st->nx;
         i++;
     } while (i !=ntimes);
@@ -152,12 +146,12 @@ short *ring2buftimes(srn_t *mou, unsigned ntimes, short nchans) /* take ntimes s
     short *sbuf=malloc(ttimes*sizeof(short));
     srn_t *st=mou;
     do {
-        sbuf[i++]=st->s;
-        st=st->nx;
         if(nchans ==2) {
-            sbuf[i++]=st->s;
-            st=st->nx;
-        }
+            sbuf[i++]=st->sv.sa[0];
+            sbuf[i++]=st->sv.sa[1];
+        } else if(nchans ==1)
+            sbuf[i++]=st->sv.s;
+        st=st->nx;
     } while (i !=ttimes);
     return sbuf;
 }
@@ -170,7 +164,7 @@ int main(int argc, char *argv[])
         printf("Usage: 4 arguments: 1) floating pt frequency value 2) seconds' duration (fp fine) 3) numchannels 4) output wavfle name.\n");
         exit(EXIT_FAILURE);
     }
-    int i, ii;
+    int i;
     unsigned csndlen=(unsigned)(.5+atof(argv[2])*SRATE); /* length of sound, in samples! */
 
     /* let's decide whther stereo or mono here */
@@ -178,31 +172,29 @@ int main(int argc, char *argv[])
 
     float wtsamps=SRATE/A440; /* wavetable modelled on the 440 frequency */
     unsigned iwtsamps=(unsigned)(.5+wtsamps); /* integer number of samples for our wavetable */
-    unsigned tsamps=ncha*iwtsamps;
-    wavt_t *wt=malloc(tsamps*sizeof(wavt_t)); /* wv_t is just ine element ... the full wavetable needs to be an array */
+    wavt_t *wt=malloc(iwtsamps*sizeof(wavt_t)); /* wv_t is just ine element ... the full wavetable needs to be an array */
     float wtstpsz=2.*M_PI/(float)iwtsamps; /* the increment size ... yes it can be a float */
     /*OK create the wavetable */
     for(i=0;i<iwtsamps;i+=1) {
-        ii=ncha*i;
-        wt[ii].assocfl =wtstpsz*i;
-        wt[ii].sonicv=AMPL*sin(wt[i].assocfl);
+        wt[i].assocfl =wtstpsz*i;
         if(ncha==2) {
-            ii++;
-            wt[ii].assocfl =wtstpsz*i;
-            wt[ii].sonicv=AMPL*sin(wt[i].assocfl);
-        }
+            wt[i].sv.sonica[0]=AMPL*sin(wt[i].assocfl);
+            wt[i].sv.sonica[1]=AMPL*sin(wt[i].assocfl);
+        } else if(ncha==1)
+            wt[i].sv.sonicv=AMPL*sin(wt[i].assocfl);
     }
 
-    /* Another frequency */
-    float nsamps=SRATE/atof(argv[1]);
-    unsigned insamps=(unsigned)(.5+nsamps);
-    srn_t *m=creasrn0(insamps);
+    /* Generate other frequencies from this wavetable */
+    float fcsamps=SRATE/atof(argv[1]);
+    unsigned ucsamps=(unsigned)(.5+fcsamps);
+    float stpsz=2.*M_PI/((float)ucsamps); /* here we recognise that insamps is a different number to nsamps */
+    srn_t *m=creasrn0(ucsamps);
     srn_t *tsrn=m;
-    float stpsz=2.*M_PI/((float)insamps); /* here we recognise that insamps is a different number to nsamps */
 
     int j, k=0;
     float kincs, xprop;
-    for(i=0;i<insamps;++i) {
+
+    for(i=0;i<ucsamps;i++) {
         kincs=stpsz*i;
         for(j=k; j<iwtsamps-1; ++j)
             if(kincs>=wt[j].assocfl)
@@ -212,7 +204,11 @@ int main(int argc, char *argv[])
         k=j-1;
         // xprop=(kincs-wt[k].assocfl)/(wt[j].assocfl-wt[k].assocfl);
         xprop=(kincs-wt[k].assocfl)/wtstpsz;
-        tsrn->s=(short)(.5+wt[k].sonicv + xprop*(wt[j].sonicv-wt[k].sonicv));
+        if(ncha==2) {
+            tsrn->sv.sa[0]=(short)(.5+wt[k].sv.sonica[0] + xprop*(wt[j].sv.sonica[0]-wt[k].sv.sonica[0]));
+            tsrn->sv.sa[1]=(short)(.5+wt[k].sv.sonica[1] + xprop*(wt[j].sv.sonica[1]-wt[k].sv.sonica[1]));
+        } else if(ncha==1)
+            tsrn->sv.s=(short)(.5+wt[k].sv.sonicv + xprop*(wt[j].sv.sonicv-wt[k].sv.sonicv));
         tsrn=tsrn->nx;
     }
 
