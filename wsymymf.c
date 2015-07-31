@@ -261,7 +261,7 @@ int main(int argc, char *argv[])
         printf("4 Arguments: 1) input wavfilename 2) mm:ss.hh time at which to start sampling 3) numsamps2extract 4) output wav.\n");
         exit(EXIT_FAILURE);
     }
-    int i, ii, ilim;
+    int i, ii;
     float fqa[NUMNOTES]={160., 220.25, 330.5, 441., 551.25, 800., 1200., 2300.};
 //     float fqa[NUMNOTES]={440.};
     unsigned csndlen=11025; /* hard coded for the time being */
@@ -271,10 +271,10 @@ int main(int argc, char *argv[])
     wh_t *twhdr=malloc(sizeof(wh_t));
     unsigned char *bf= xfw(argv[1], argv[2], twhdr, ncsamps);
     short *vals=malloc((twhdr->byid/2)*sizeof(short));
-    ilim=twhdr->byid/2;
-    for(i=0;i<ilim;i++) {
-        vals[i]=bf[2*i+1]<<8;
-        vals[i] |=bf[2*i];
+    for(i=0;i<twhdr->byid;i+=2) {
+        ii=i/2;
+        vals[ii]=((short)bf[i+1])<<8;
+        vals[ii] |=(short)bf[i];
     }
     free(bf);
 
@@ -320,7 +320,7 @@ int main(int argc, char *argv[])
     sr_t *tsr;
     float stpsz;
 
-    int j, k=0, m;
+    int j, k, m;
     float kincs, xprop;
 
     srp_t *sra=malloc(NUMNOTES*sizeof(srp_t)); /* array of rings */
@@ -332,6 +332,7 @@ int main(int argc, char *argv[])
         sra[m].sr=creasrn0(sra[m].sz);
         tsr=sra[m].sr;
         stpsz=2.*M_PI/((float)scsamps);
+        k=0;
 
         for(i=0;i<sra[m].sz;i++) {
             kincs=stpsz*i;

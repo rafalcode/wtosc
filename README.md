@@ -21,6 +21,10 @@ There are three broad stages. The first is building up the wavetable based on a 
 One important note is that, because the wavtable is used for calculation, the amplitude values of the sound is held in floats (or doubles) for precision. If we decide to extract sound values from a wav file, the integer sound values are converted to floats.
 
 
+## programming tips
+* when shrinking or expanding a wav file, in the header, only the byid and glen (actually byid+36) member need be changed, which happily is not much.
+* using fread() on a wav file means loading the data into unsigned, as opposed to signed, char types.
+
 ## Program listing
 * wnums: helper function to print out the numeric values according to a 100 sample point starting from a specific point in a wav file
 * symyf: compile with "make symyf" proof-of-concept wavetable. One sinewave frequency synthesised to a wav file.

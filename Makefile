@@ -25,6 +25,10 @@ wnums: wnums.c
 wnums_d: wnums.c
 	${CC} ${CFLAGS} -DDBG $^ -o $@
 
+# based on wnums
+magbit: magbit.c
+	${CC} ${CFLAGS} $^ -o $@
+
 # wsymymf: the extra w here is for WAV. The idea is to populate the wavetable from samples in a wav file
 wsymymf: wsymymf.c
 	${CC} ${CFLAGS} $^ -o $@
