@@ -15,7 +15,7 @@
 #define SRATE 44100.0
 #define NUMNOTES 8
 /* hardcoded number of samples */
-#define NSAMPS 800 /* will need to be mutliplied by 2 if nhans is 2 */
+#define NCSAMPS 800 /* Number of Channel Samps: will need to be mutliplied by 2 if nhans is 2 */
 #define SAMPF 220 /* in practice, we'll be clueless about the frequency, we would have to chose a nice one using ear */
 
 typedef struct /* time point, tpt */
@@ -26,7 +26,10 @@ typedef struct /* time point, tpt */
 struct svals_t /* a struct with 2 floats: assocfl, and sonicv */
 {
     float assocfl; /* float associated with this */
-    float sonicv; /* sonic value */
+    union {
+        float sonicv; /* sonic value */
+        float sonica[2];
+    } sv;
 };
 
 typedef struct /* wavt_t */
@@ -282,7 +285,7 @@ int main(int argc, char *argv[])
         printf("3 Arguments: 1) filename, input wav 2) mm:ss.hh time at which to start sampling 3) output wav.\n");
         exit(EXIT_FAILURE);
     }
-    int i;
+    int i, ilim;
     float fqa[NUMNOTES]={160., 220.25, 330.5, 441., 551.25, 800., 1200., 2300.};
     unsigned csndlen=11025; /* hard coded for the time being */
 
@@ -290,41 +293,42 @@ int main(int argc, char *argv[])
     wh_t *twhdr=malloc(sizeof(wh_t));
     char *bf= xfw(argv[1], argv[2], twhdr);
     short *vals=malloc((twhdr->byid/2)*sizeof(short));
-    for(i=0;i<twhdr->byid/2;i++) {
+    ilim=twhdr->byid/2;
+    for(i=0;i<ilim;i++) {
         vals[i]=bf[2*i+1]<<8;
         vals[i] |=bf[2*i];
     }
     free(bf);
 
-    /* setting up the "model wavetable" */
+    /* 1/3. setting up the "model wavetable" */
     wavt_t *wt=malloc(sizeof(wavt_t));
-    wt->nsamps=(unsigned)(twhdr->nchans*NSAMPS);
+    wt->nsamps=(unsigned)NSAMPS;
     wt->d=malloc(wt->nsamps*sizeof(struct svals_t));
     wt->svalranges=malloc((wt->nsamps-1)*sizeof(struct svals_t));
     wt->stpsz=2.*M_PI/((float)wt->nsamps); /* distance in radians btwn each sampel int he wavelength */
     /* OK create the wavetable */
     if(twhdr->nchans ==1) {
         wt->d[0].assocfl = 0.;
-        wt->d[0].sonicv=vals[0];
+        wt->d[0].sv.sonicv=vals[0];
         for(i=1;i<wt->nsamps;++i) {
             wt->d[i].assocfl =wt->stpsz*i;
-            wt->d[i].sonicv=vals[i];
-            wt->svalranges[i-1]= wt->d[i].sonicv - wt->d[i-1].sonicv; /* the difference with the previous value, used for interpolating */
+            wt->d[i].sv.sonicv=vals[i];
+            wt->svalranges[i-1]= wt->d[i].sv.sonicv - wt->d[i-1].sv.sonicv; /* the difference with the previous value, used for interpolating */
         }
     } else if(twhdr->nchans ==2) {
         wt->d[0].assocfl = 0.;
-        wt->d[0].sonicv=vals[0];
+        wt->d[0].sv.sonicv=vals[0];
         for(i=2;i<wt->nsamps;i+=2) {
             wt->d[i].assocfl =wt->stpsz*i/2;
-            wt->d[i].sonicv=vals[i];
-            wt->svalranges[i-2]= wt->d[i].sonicv - wt->d[i-2].sonicv; /* the difference with the previous value, used for interpolating */
+            wt->d[i].sv.sonicv=vals[i];
+            wt->svalranges[i-2]= wt->d[i].sv.sonicv - wt->d[i-2].sv.sonicv; /* the difference with the previous value, used for interpolating */
         }
         wt->d[1].assocfl = 0.;
-        wt->d[1].sonicv=vals[1];
+        wt->d[1].sv.sonicv=vals[1];
         for(i=3;i<wt->nsamps;i+=2) {
             wt->d[i].assocfl =wt->stpsz*i/2;
-            wt->d[i].sonicv=vals[i];
-            wt->svalranges[i-2]= wt->d[i].sonicv - wt->d[i-2].sonicv; /* the difference with the previous value, used for interpolating */
+            wt->d[i].sv.sonicv=vals[i];
+            wt->svalranges[i-2]= wt->d[i].sv.sonicv - wt->d[i-2].sv.sonicv; /* the difference with the previous value, used for interpolating */
         }
     }
 
@@ -352,7 +356,7 @@ int main(int argc, char *argv[])
 
             /* first chan */
             for(i=0;i<sra[m].sz;i+=2) {
-                kincs=stpsz*i/2;
+                kincs=stpsz*(i/2.);
                 for(j=k; j<wt->nsamps-2; j+=2)
                     if(kincs>=wt->d[j].assocfl) /* d[0].assocfl always zero, so the next "continue" will alwsays increment j to 1, even if k=0 */
                         continue;
@@ -360,7 +364,7 @@ int main(int argc, char *argv[])
                         break;
                 k=j-2; /* edge condition of k watched, the above continue will ensure it's never zero */
                 xprop=(kincs-wt->d[k].assocfl)/wt->stpsz;
-                tsr->s=(short)(.5+wt->d[k].sonicv + xprop*wt->svalranges[k]);
+                tsr->s=(short)(.5+wt->d[k].sv.sonicv + xprop*wt->svalranges[k]);
                 tsr=tsr->nx;
             }
             /* second chan */
@@ -373,7 +377,7 @@ int main(int argc, char *argv[])
                         break;
                 k=j-2; /* edge condition of k watched, the above continue will ensure it's never zero */
                 xprop=(kincs-wt->d[k].assocfl)/wt->stpsz;
-                tsr->s=(short)(.5+wt->d[k].sonicv + xprop*wt->svalranges[k]);
+                tsr->s=(short)(.5+wt->d[k].sv.sonicv + xprop*wt->svalranges[k]);
                 tsr=tsr->nx;
             }
 
@@ -387,7 +391,7 @@ int main(int argc, char *argv[])
                         break;
                 k=j-1;
                 xprop=(kincs-wt->d[k].assocfl)/wt->stpsz;
-                tsr->s=(short)(.5+wt->d[k].sonicv + xprop*wt->svalranges[k]);
+                tsr->s=(short)(.5+wt->d[k].sv.sonicv + xprop*wt->svalranges[k]);
                 tsr=tsr->nx;
             }
         }
