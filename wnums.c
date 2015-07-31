@@ -147,7 +147,7 @@ int hdrchk(wh_t *inhdr)
     return 0;
 }
 
-char *xfw(char *inwf, char *tp, wh_t *inhdr) /* xfw: extract from wav: the wav header can be used as the metadata for the returned buffer */
+unsigned char *xfw(char *inwf, char *tp, wh_t *inhdr) /* xfw: extract from wav: the wav header can be used as the metadata for the returned buffer */
 {
     FILE *inwavfp=fopen(inwf,"rb");
     if ( inwavfp == NULL ) {
@@ -175,9 +175,9 @@ char *xfw(char *inwf, char *tp, wh_t *inhdr) /* xfw: extract from wav: the wav h
     /* recreate based on samples taken */
     inhdr->byid = inhdr->bypc*inhdr->nchans*NCSAMPS; /* number of bytes to extract */
     inhdr->glen = inhdr->byid+36;
-    char *bf=malloc(inhdr->byid);
+    unsigned char *bf=malloc(inhdr->byid*sizeof(unsigned char));
     fseek(inwavfp, point, SEEK_CUR);
-    if ( fread(bf, inhdr->byid, sizeof(char), inwavfp) < 1 ) {
+    if ( fread(bf, inhdr->byid, sizeof(unsigned char), inwavfp) < 1 ) {
         printf("Sorry, trouble putting input file into array. Overshot maybe?\n"); 
         exit(EXIT_FAILURE);
     }
@@ -193,30 +193,33 @@ int main(int argc, char *argv[])
         printf("Usage: samples from a wav's time point Args: 1) Name of wavfile 2) mm:ss.hh string say to where sampling should begin.\n");
         exit(EXIT_FAILURE);
     }
-    int i;
+    int i, ii;
 
     wh_t *twhdr=malloc(sizeof(wh_t));
-    char *bf= xfw(argv[1], argv[2], twhdr);
+    unsigned char *bf= xfw(argv[1], argv[2], twhdr);
     /* need to convert bytes in smallendian to shorts */
-    short *vals=malloc((twhdr->byid/2)*sizeof(short));
-    for(i=0;i<twhdr->byid/2;i++) {
-        vals[i]=bf[2*i+1]<<8;
-        vals[i] |=bf[2*i];
+    int byidasshort=twhdr->byid/2;
+    short *vals=malloc(byidasshort*sizeof(short));
+
+    printf("bytes in data from hdr: %d\n", twhdr->byid); 
+    for(i=0;i<twhdr->byid;i+=2) {
+        ii=i/2;
+        vals[ii]=((short)bf[i+1])<<8; /* will also set lower bytes to zero */
+        vals[ii] |=(short)bf[i];
     }
 
-    int ilim=twhdr->byid/2;
     if(twhdr->nchans ==2) {
         /* first channel */
-        for(i=0;i<ilim;i+=2) 
-            printf("%d ", vals[i]);
+        for(i=0;i<byidasshort;i+=2) 
+            printf("%hx ", vals[i]);
         printf("\n"); 
         /* second channel */
-        for(i=1;i<ilim;i+=2) 
-            printf("%d ", vals[i]);
+        for(i=1;i<byidasshort;i+=2) 
+            printf("%hx ", vals[i]);
         printf("\n"); 
     } else { /* it's in mono */
-        for(i=0;i<ilim;i++) 
-            printf("%d ", vals[i]);
+        for(i=0;i<byidasshort; i++)
+            printf("%hx ", vals[i]);
         printf("\n"); 
     }
 

@@ -29,6 +29,10 @@ wnums_d: wnums.c
 wsymymf: wsymymf.c
 	${CC} ${CFLAGS} $^ -o $@
 
+# wsymymf_d: need the debug version to discover where the distortion is coming from
+wsymymf_d: wsymymf.c
+	${CC} ${CFLAGS} -DDBG $^ -o $@
+
 .PHONY: clean
 
 clean:

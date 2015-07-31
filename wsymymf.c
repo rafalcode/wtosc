@@ -10,13 +10,11 @@
 #include<string.h>
 #include<math.h>
 
-#define MAXSHORT 0x7FFF
-#define AMPL 1.0*MAXSHORT
 #define SRATE 44100.0
 #define NUMNOTES 8
 /* hardcoded number of samples */
-#define NCSAMPS 800 /* Number of Channel Samps: will need to be mutliplied by 2 if nhans is 2 */
-#define SAMPF 220 /* in practice, we'll be clueless about the frequency, we would have to chose a nice one using ear */
+#define NCSAMPS 100 /* Number of Channel Samps: will need to be mutliplied by 2 if nhans is 2 */
+#define SAMPF 440 /* ACTUALLY NOT NECESSARY:in practice, we'll be clueless about the frequency, we would have to chose a nice one using ear */
 
 typedef struct /* time point, tpt */
 {
@@ -35,15 +33,17 @@ struct svals_t /* a struct with 2 floats: assocfl, and sonicv */
 typedef struct /* wavt_t */
 {
     struct svals_t *d;
-    float *svalranges;
     float fsamps;
     unsigned nsamps;
     float stpsz;
 } wavt_t;
 
-struct s_r_n /* short int ring node struct: not typedef'd */
+struct s_r_n /* short int ring node struct */
 {
-    short s;
+    union {
+        short s;
+        short sa[2];
+    } sv;
     struct s_r_n *nx;
 };
 typedef struct s_r_n sr_t;
@@ -103,7 +103,7 @@ tpt *s2tp(char *str)
     return p;
 }
 
-char *xfw(char *inwf, char *tp, wh_t *inhdr) /* xfw: extract from wav */
+unsigned char *xfw(char *inwf, char *tp, wh_t *inhdr, unsigned ncsamps) /* xfw: extract from wav */
 {
     FILE *inwavfp=fopen(inwf,"rb");
     if ( inwavfp == NULL ) {
@@ -127,11 +127,11 @@ char *xfw(char *inwf, char *tp, wh_t *inhdr) /* xfw: extract from wav */
     }
 
     /* recreate based on samples taken */
-    inhdr->byid = inhdr->bypc*inhdr->nchans*NSAMPS; /* number of bytes to extract */
+    inhdr->byid = inhdr->bypc*inhdr->nchans*ncsamps; /* number of bytes to extract */
     inhdr->glen = inhdr->byid+36;
-    char *bf=malloc(inhdr->byid);
+    unsigned char *bf=malloc(inhdr->byid);
     fseek(inwavfp, point, SEEK_CUR);
-    if ( fread(bf, inhdr->byid, sizeof(char), inwavfp) < 1 ) { /* Yup! we slurp in the baby! */
+    if ( fread(bf, inhdr->byid, sizeof(unsigned char), inwavfp) < 1 ) { /* Yup! we slurp in the baby! */
         printf("Sorry, trouble putting input file into array. Overshot maybe?\n"); 
         exit(EXIT_FAILURE);
     }
@@ -177,23 +177,29 @@ sr_t *creasrn0(unsigned ssz) /* create empty ring of size ssz */
     return mou;
 }
 
-void prtring(sr_t *mou)
+void prtring(sr_t *mou, short ncha)
 {
     sr_t *st=mou;
     do {
-        printf("%d ", st->s);
+        if(ncha==2)
+            printf("%d:%d ", st->sv.sa[0], st->sv.sa[1]);
+        else if(ncha==1)
+            printf("%d ", st->sv.s);
         st=st->nx;
     } while (st !=mou);
     putchar('\n');
     return;
 }
 
-void prtimesring(sr_t *mou, unsigned ntimes)
+void prtimesring(sr_t *mou, unsigned ntimes, short ncha) /* print all values from CYCLING through the ring */
 {
     unsigned i=0;
     sr_t *st=mou;
     do {
-        printf("%d ", st->s);
+        if(ncha==2)
+            printf("%d:%d ", st->sv.sa[0], st->sv.sa[1]);
+        else if(ncha==1)
+            printf("%d ", st->sv.s);
         st=st->nx;
         i++;
     } while (i !=ntimes);
@@ -225,73 +231,45 @@ void freering(sr_t *mou)
     free(mou);
 }
 
-short *prtimesring2a(srp_t *sra, unsigned nnotes, unsigned csndlen, short nchans)
+short *ring2buftimes(srp_t *sra, unsigned nnotes, unsigned ntimes, short nchans) /* take ntimes steps through ring */
 {
-    unsigned i, ii, j;
-    short *sbuf=malloc(nchans*csndlen*nnotes*sizeof(short));
+    unsigned i=0, ii, j;
+    unsigned ttimes=ntimes*nchans;
+    short *sbuf=malloc(nnotes*ttimes*sizeof(short));
     sr_t *st;
 
-    if(nchans ==1) {
-
-        i=0;
-        for(j=0;j<nnotes;++j) {
-            ii=0;
-            st=sra[j].sr;
-            do {
-                sbuf[i++]=st->s;
-                st=st->nx;
-                ii++;
-            } while (ii < csndlen);
-        }
-
-    } else if(nchans ==2) {
-
-        /* chan 1*/
-        i=0;
-        for(j=0;j<nnotes;j++) {
-            ii=0;
-            st=sra[j].sr;
-            do {
-                sbuf[i]=st->s;
-                i+=2;
-                st=st->nx;
-                st=st->nx;
-                ii+=2;
-            } while (ii < nchans*csndlen);
-        }
-        /* chan 2*/
-        i=1;
-        for(j=0;j<nnotes;j++) {
-            ii=1;
-            st=sra[j].sr;
+    for(j=0;j<nnotes;j++) {
+        ii=0;
+        st=sra[j].sr;
+        do {
+            if(nchans ==2) {
+                sbuf[i++]=st->sv.sa[0];
+                sbuf[i++]=st->sv.sa[1];
+            } else if(nchans ==1)
+                sbuf[i++]=st->sv.s;
+            ii++;
             st=st->nx;
-            do {
-                sbuf[i]=st->s;
-                i+=2;
-                st=st->nx;
-                st=st->nx;
-                ii+=2;
-            } while (ii < nchans*csndlen);
-        }
+        } while (ii <ntimes);
     }
-
     return sbuf;
 }
 
 int main(int argc, char *argv[])
 {
-    if(argc != 4) {
+    if(argc != 5) {
         printf("Program to populate a wavetable from a certain point in a WAV, and generate different frequencies on it.\n");
-        printf("3 Arguments: 1) filename, input wav 2) mm:ss.hh time at which to start sampling 3) output wav.\n");
+        printf("4 Arguments: 1) input wavfilename 2) mm:ss.hh time at which to start sampling 3) numsamps2extract 4) output wav.\n");
         exit(EXIT_FAILURE);
     }
-    int i, ilim;
+    int i, ii, ilim;
     float fqa[NUMNOTES]={160., 220.25, 330.5, 441., 551.25, 800., 1200., 2300.};
+//     float fqa[NUMNOTES]={440.};
     unsigned csndlen=11025; /* hard coded for the time being */
 
     /* get our sampels from the wav file */
+    unsigned ncsamps=atoi(argv[3]);
     wh_t *twhdr=malloc(sizeof(wh_t));
-    char *bf= xfw(argv[1], argv[2], twhdr);
+    unsigned char *bf= xfw(argv[1], argv[2], twhdr, ncsamps);
     short *vals=malloc((twhdr->byid/2)*sizeof(short));
     ilim=twhdr->byid/2;
     for(i=0;i<ilim;i++) {
@@ -302,39 +280,42 @@ int main(int argc, char *argv[])
 
     /* 1/3. setting up the "model wavetable" */
     wavt_t *wt=malloc(sizeof(wavt_t));
-    wt->nsamps=(unsigned)NSAMPS;
+    wt->nsamps=ncsamps;
     wt->d=malloc(wt->nsamps*sizeof(struct svals_t));
-    wt->svalranges=malloc((wt->nsamps-1)*sizeof(struct svals_t));
     wt->stpsz=2.*M_PI/((float)wt->nsamps); /* distance in radians btwn each sampel int he wavelength */
-    /* OK create the wavetable */
+    /* OK create the wavetable: the shorts in vals[] must be changed to floats */
     if(twhdr->nchans ==1) {
         wt->d[0].assocfl = 0.;
-        wt->d[0].sv.sonicv=vals[0];
+        wt->d[0].sv.sonicv=(float)vals[0];
         for(i=1;i<wt->nsamps;++i) {
             wt->d[i].assocfl =wt->stpsz*i;
-            wt->d[i].sv.sonicv=vals[i];
-            wt->svalranges[i-1]= wt->d[i].sv.sonicv - wt->d[i-1].sv.sonicv; /* the difference with the previous value, used for interpolating */
+            wt->d[i].sv.sonicv=(float)vals[i];
         }
     } else if(twhdr->nchans ==2) {
         wt->d[0].assocfl = 0.;
-        wt->d[0].sv.sonicv=vals[0];
-        for(i=2;i<wt->nsamps;i+=2) {
-            wt->d[i].assocfl =wt->stpsz*i/2;
-            wt->d[i].sv.sonicv=vals[i];
-            wt->svalranges[i-2]= wt->d[i].sv.sonicv - wt->d[i-2].sv.sonicv; /* the difference with the previous value, used for interpolating */
-        }
-        wt->d[1].assocfl = 0.;
-        wt->d[1].sv.sonicv=vals[1];
-        for(i=3;i<wt->nsamps;i+=2) {
-            wt->d[i].assocfl =wt->stpsz*i/2;
-            wt->d[i].sv.sonicv=vals[i];
-            wt->svalranges[i-2]= wt->d[i].sv.sonicv - wt->d[i-2].sv.sonicv; /* the difference with the previous value, used for interpolating */
+        wt->d[0].sv.sonica[0]=(float)vals[0];
+        wt->d[0].sv.sonica[1]=(float)vals[1];
+        for(i=1;i<wt->nsamps;i++) {
+            ii=2*i;
+            wt->d[i].assocfl =wt->stpsz*i;
+            wt->d[i].sv.sonica[0]=(float)vals[ii];
+            wt->d[i].sv.sonica[1]=(float)vals[ii+1];
         }
     }
 
-    /* so our wavetable has been created, as you'll note it only has accurately representative values for one frequency,
-     * but we're still going to use for other frequencies */
+#ifdef DBG2
+    printf("Values from wav file stored in wavtable (as floats):\n"); 
+    if(twhdr->nchans ==1)
+        for(i=0;i<wt->nsamps;++i)
+            printf("%.1f ", wt->d[i].sv.sonicv);
+    else if(twhdr->nchans ==2)
+        for(i=0;i<wt->nsamps;++i)
+            printf("%.1f:%.1f ", wt->d[i].sv.sonica[0], wt->d[i].sv.sonica[1]);
+    printf("\n"); 
+#endif
 
+    /* 2/3: so our wavetable has been created, as you'll note it only has accurately representative values for one frequency,
+     * but we're still going to use for other frequencies */
     float fsamps;
     sr_t *tsr;
     float stpsz;
@@ -347,60 +328,38 @@ int main(int argc, char *argv[])
     for(m=0;m<NUMNOTES;++m) { /* loop for our frequency range */
         fsamps=SRATE/fqa[m];
         scsamps=(unsigned)(.5+fsamps);
-        sra[m].sz=twhdr->nchans*scsamps;
+        sra[m].sz=scsamps;
         sra[m].sr=creasrn0(sra[m].sz);
         tsr=sra[m].sr;
         stpsz=2.*M_PI/((float)scsamps);
 
-        if(twhdr->nchans ==2) {
-
-            /* first chan */
-            for(i=0;i<sra[m].sz;i+=2) {
-                kincs=stpsz*(i/2.);
-                for(j=k; j<wt->nsamps-2; j+=2)
-                    if(kincs>=wt->d[j].assocfl) /* d[0].assocfl always zero, so the next "continue" will alwsays increment j to 1, even if k=0 */
-                        continue;
-                    else
-                        break;
-                k=j-2; /* edge condition of k watched, the above continue will ensure it's never zero */
-                xprop=(kincs-wt->d[k].assocfl)/wt->stpsz;
-                tsr->s=(short)(.5+wt->d[k].sv.sonicv + xprop*wt->svalranges[k]);
-                tsr=tsr->nx;
-            }
-            /* second chan */
-            for(i=1;i<sra[m].sz;i+=2) {
-                kincs=stpsz*i/2;
-                for(j=k; j<wt->nsamps-2; j+=2)
-                    if(kincs>=wt->d[j].assocfl) /* d[0].assocfl always zero, so the next "continue" will alwsays increment j to 1, even if k=0 */
-                        continue;
-                    else
-                        break;
-                k=j-2; /* edge condition of k watched, the above continue will ensure it's never zero */
-                xprop=(kincs-wt->d[k].assocfl)/wt->stpsz;
-                tsr->s=(short)(.5+wt->d[k].sv.sonicv + xprop*wt->svalranges[k]);
-                tsr=tsr->nx;
-            }
-
-        } else if(twhdr->nchans ==1) {
-            for(i=0;i<sra[m].sz;i++) {
-                kincs=stpsz*i;
-                for(j=k; j<wt->nsamps-1; j++)
-                    if(kincs>=wt->d[j].assocfl) /* d[0].assocfl always zero, so the next "continue" will alwsays increment j to 1, even if k=0 */
-                        continue;
-                    else
-                        break;
-                k=j-1;
-                xprop=(kincs-wt->d[k].assocfl)/wt->stpsz;
-                tsr->s=(short)(.5+wt->d[k].sv.sonicv + xprop*wt->svalranges[k]);
-                tsr=tsr->nx;
-            }
+        for(i=0;i<sra[m].sz;i++) {
+            kincs=stpsz*i;
+            for(j=k; j<wt->nsamps-1; j++)
+                if(kincs>=wt->d[j].assocfl)
+                    continue;
+                else
+                    break;
+            k=j-1;
+            xprop=(kincs-wt->d[k].assocfl)/wt->stpsz;
+            if(twhdr->nchans==2) {
+                tsr->sv.sa[0]=(short)(.5+wt->d[k].sv.sonica[0] + xprop*(wt->d[j].sv.sonica[0]-wt->d[k].sv.sonica[0]));
+                tsr->sv.sa[1]=(short)(.5+wt->d[k].sv.sonica[1] + xprop*(wt->d[j].sv.sonica[1]-wt->d[k].sv.sonica[1]));
+            } else if(twhdr->nchans==1)
+                tsr->sv.s=(short)(.5+wt->d[k].sv.sonicv + xprop*(wt->d[j].sv.sonicv-wt->d[k].sv.sonicv));
+            tsr=tsr->nx;
         }
+#ifdef DBG
+        printf("Ring values: these have been calculated from the wavetable:\n"); 
+        prtring(tsr, twhdr->nchans);
+#endif
     }
 
+    /* 3/3: our cycle through ring and sound into buffer */
     short *sbuf; /* our sound info buffer */
-    sbuf=prtimesring2a(sra, NUMNOTES, csndlen, twhdr->nchans);
+    sbuf=ring2buftimes(sra, NUMNOTES, csndlen, twhdr->nchans);
     wh_t *hdr=hdr4chunk((int)SRATE, twhdr->nchans, NUMNOTES*csndlen);
-    FILE *fout=fopen(argv[3], "wb");
+    FILE *fout=fopen(argv[4], "wb");
     fwrite(hdr, sizeof(char), 44, fout);
     fwrite(sbuf, sizeof(short), twhdr->nchans*NUMNOTES*csndlen, fout); /* shorts will get written as small endian bytes in file in x86 system */
     fclose(fout);
@@ -409,7 +368,6 @@ int main(int argc, char *argv[])
     free(twhdr);
     free(vals);
     free(sbuf);
-    free(wt->svalranges);
     free(wt->d);
     free(wt);
     for(i=0;i<NUMNOTES;++i) 
