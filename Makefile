@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-g -Wall
 
-EXECUTABLES=symyf symymf wsymymf
+EXECUTABLES=symyf symymf wsymymf wsymymf_d wnums wnums_d lnums
 
 # symyf: SYnthesise MY Frequency. Accepts a frequency vlaue on the command line, and synthesizes a sine wave on it, using a wavetable.
 symyf: symyf.c
@@ -23,6 +23,14 @@ samh: samh.c
 wnums: wnums.c
 	${CC} ${CFLAGS} $^ -o $@
 wnums_d: wnums.c
+	${CC} ${CFLAGS} -DDBG $^ -o $@
+
+# control a certain level
+lnums: lnums.c
+	${CC} ${CFLAGS} $^ -o $@
+
+# control a certain level
+lnums_d: lnums.c
 	${CC} ${CFLAGS} -DDBG $^ -o $@
 
 # based on wnums

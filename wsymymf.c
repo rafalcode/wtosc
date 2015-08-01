@@ -11,6 +11,7 @@
 #include<math.h>
 
 #define SRATE 44100.0
+#define SILX .25 /* silence to put in between notes */
 #define NUMNOTES 8
 /* hardcoded number of samples */
 #define NCSAMPS 100 /* Number of Channel Samps: will need to be mutliplied by 2 if nhans is 2 */
@@ -230,25 +231,27 @@ void freering(sr_t *mou)
     free(mou);
 }
 
-short *ring2buftimes(srp_t *sra, unsigned nnotes, unsigned ntimes, short nchans) /* take ntimes steps through ring */
+short **ring2buftimes(srp_t *sra, unsigned nnotes, unsigned ntimes, short nchans) /* take ntimes steps through ring */
 {
-    unsigned i=0, ii, j;
+    unsigned i, j;
     unsigned ttimes=ntimes*nchans;
-    short *sbuf=malloc(nnotes*ttimes*sizeof(short));
+    short **sbuf=malloc(nnotes*sizeof(short*));
+    for(i=0;i<nnotes;++i) 
+        sbuf[i]=malloc(ttimes*sizeof(short));
+
     sr_t *st;
 
     for(j=0;j<nnotes;j++) {
-        ii=0;
+        i=0;
         st=sra[j].sr;
-        do {
+        while(i<ttimes) {
             if(nchans ==2) {
-                sbuf[i++]=st->sv.sa[0];
-                sbuf[i++]=st->sv.sa[1];
+                sbuf[j][i++]=st->sv.sa[0];
+                sbuf[j][i++]=st->sv.sa[1];
             } else if(nchans ==1)
-                sbuf[i++]=st->sv.s;
-            ii++;
+                sbuf[j][i++]=st->sv.s;
             st=st->nx;
-        } while (ii <ntimes);
+        }
     }
     return sbuf;
 }
@@ -359,18 +362,27 @@ int main(int argc, char *argv[])
     }
 
     /* 3/3: our cycle through ring and sound into buffer */
-    short *sbuf; /* our sound info buffer */
+    short **sbuf; /* our sound info buffer */
+    unsigned silsamps=(unsigned)(.5+SILX*SRATE);
+    short *silbuf=calloc(silsamps*twhdr->nchans,sizeof(short));
     sbuf=ring2buftimes(sra, NUMNOTES, csndlen, twhdr->nchans);
-    wh_t *hdr=hdr4chunk((int)SRATE, twhdr->nchans, NUMNOTES*csndlen);
+    wh_t *hdr=hdr4chunk((int)SRATE, twhdr->nchans, (NUMNOTES-1)*silsamps + NUMNOTES*csndlen);
     FILE *fout=fopen(argv[4], "wb");
     fwrite(hdr, sizeof(char), 44, fout);
-    fwrite(sbuf, sizeof(short), twhdr->nchans*NUMNOTES*csndlen, fout); /* shorts will get written as small endian bytes in file in x86 system */
+    for(i=0;i<NUMNOTES;++i) {
+        fwrite(sbuf[i], sizeof(short), twhdr->nchans*csndlen, fout);
+        if(i!=NUMNOTES-1)
+            fwrite(silbuf, sizeof(short), twhdr->nchans*silsamps, fout);
+    }
     fclose(fout);
 
     free(hdr);
     free(twhdr);
     free(vals);
+    for(i=0;i<NUMNOTES;++i) 
+        free(sbuf[i]);
     free(sbuf);
+    free(silbuf);
     free(wt->d);
     free(wt);
     for(i=0;i<NUMNOTES;++i) 
