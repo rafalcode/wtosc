@@ -211,15 +211,15 @@ int main(int argc, char *argv[])
     if(twhdr->nchans ==2) {
         /* first channel */
         for(i=0;i<byidasshort;i+=2) 
-            printf("%hx ", vals[i]);
+            printf("%hd ", vals[i]);
         printf("\n"); 
         /* second channel */
         for(i=1;i<byidasshort;i+=2) 
-            printf("%hx ", vals[i]);
+            printf("%hd ", vals[i]);
         printf("\n"); 
     } else { /* it's in mono */
         for(i=0;i<byidasshort; i++)
-            printf("%hx ", vals[i]);
+            printf("%hd ", vals[i]);
         printf("\n"); 
     }
 

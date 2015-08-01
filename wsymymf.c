@@ -14,16 +14,15 @@
 #define NUMNOTES 8
 /* hardcoded number of samples */
 #define NCSAMPS 100 /* Number of Channel Samps: will need to be mutliplied by 2 if nhans is 2 */
-#define SAMPF 440 /* ACTUALLY NOT NECESSARY:in practice, we'll be clueless about the frequency, we would have to chose a nice one using ear */
 
 typedef struct /* time point, tpt */
 {
     int m, s, h;
 } tpt;
 
-struct svals_t /* a struct with 2 floats: assocfl, and sonicv */
+struct svals_t /* a struct with 2 floats: rd, and sonicv */
 {
-    float assocfl; /* float associated with this */
+    float rd; /* float associated with the radial distance */
     union {
         float sonicv; /* sonic value */
         float sonica[2];
@@ -262,7 +261,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     int i, ii;
-    float fqa[NUMNOTES]={160., 220.25, 330.5, 441., 551.25, 800., 1200., 2300.};
+    float fqa[NUMNOTES]={440., 480., 520., 551.25, 660., 800., 1100., 1500.};
 //     float fqa[NUMNOTES]={440.};
     unsigned csndlen=11025; /* hard coded for the time being */
 
@@ -283,21 +282,24 @@ int main(int argc, char *argv[])
     wt->nsamps=ncsamps;
     wt->d=malloc(wt->nsamps*sizeof(struct svals_t));
     wt->stpsz=2.*M_PI/((float)wt->nsamps); /* distance in radians btwn each sampel int he wavelength */
+#ifdef DBG
+    printf("wt->stpsz=%.2f / wt->nsamps=%u\n", wt->stpsz, wt->nsamps);
+#endif
     /* OK create the wavetable: the shorts in vals[] must be changed to floats */
     if(twhdr->nchans ==1) {
-        wt->d[0].assocfl = 0.;
+        wt->d[0].rd = 0.;
         wt->d[0].sv.sonicv=(float)vals[0];
         for(i=1;i<wt->nsamps;++i) {
-            wt->d[i].assocfl =wt->stpsz*i;
+            wt->d[i].rd =wt->stpsz*i;
             wt->d[i].sv.sonicv=(float)vals[i];
         }
     } else if(twhdr->nchans ==2) {
-        wt->d[0].assocfl = 0.;
+        wt->d[0].rd = 0.;
         wt->d[0].sv.sonica[0]=(float)vals[0];
         wt->d[0].sv.sonica[1]=(float)vals[1];
         for(i=1;i<wt->nsamps;i++) {
             ii=2*i;
-            wt->d[i].assocfl =wt->stpsz*i;
+            wt->d[i].rd =wt->stpsz*i;
             wt->d[i].sv.sonica[0]=(float)vals[ii];
             wt->d[i].sv.sonica[1]=(float)vals[ii+1];
         }
@@ -337,12 +339,12 @@ int main(int argc, char *argv[])
         for(i=0;i<sra[m].sz;i++) {
             kincs=stpsz*i;
             for(j=k; j<wt->nsamps-1; j++)
-                if(kincs>=wt->d[j].assocfl)
+                if(kincs>=wt->d[j].rd)
                     continue;
                 else
                     break;
             k=j-1;
-            xprop=(kincs-wt->d[k].assocfl)/wt->stpsz;
+            xprop=(kincs-wt->d[k].rd)/wt->stpsz;
             if(twhdr->nchans==2) {
                 tsr->sv.sa[0]=(short)(.5+wt->d[k].sv.sonica[0] + xprop*(wt->d[j].sv.sonica[0]-wt->d[k].sv.sonica[0]));
                 tsr->sv.sa[1]=(short)(.5+wt->d[k].sv.sonica[1] + xprop*(wt->d[j].sv.sonica[1]-wt->d[k].sv.sonica[1]));
@@ -350,7 +352,7 @@ int main(int argc, char *argv[])
                 tsr->sv.s=(short)(.5+wt->d[k].sv.sonicv + xprop*(wt->d[j].sv.sonicv-wt->d[k].sv.sonicv));
             tsr=tsr->nx;
         }
-#ifdef DBG
+#ifdef DBG2
         printf("Ring values: these have been calculated from the wavetable:\n"); 
         prtring(tsr, twhdr->nchans);
 #endif

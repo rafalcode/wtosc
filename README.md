@@ -1,8 +1,8 @@
-# wtsynt
-sound synthesis via the wavetable method
+# wtosc
+An oscillator is a first step in sound synthesis. Sound synthesis involved complex combinations of waveforms, and a wavetable oscillator helps in this task by providing a way to generate one waveform, with quite alot of flexibility
 
 # introduction
-Wavetables are a very simple, and also, very lazy idea. For the latter reason, they are sometimes avoided as an inferior approach to sound synthesis. At the same time, it's interesting to ask how far one can get with such a lazy approach.
+Wavetables are a very simple, and also, very lazy idea. For the latter reason, they are sometimes avoided as an inferior approach in sound synthesis. At the same time, it's interesting to ask how far one can get with such a lazy approach.
 
 ## Laziness
 So why exactly are wavetables lazy? Well, they devote themselves to calculating values for the absolute minimum: a single wavelength and no more, and only for a single frequency of that waveform. Values for wavelengths of arbitrary frequencies are derived from this, and cycled through a specified number of times, which of course equates to the frequency. Because they are solely focused on digital audio, the wavelength of each arbitrary frequency is sampled at a discrete and different set of points. Because each point represents a fixed time unit, shorter wavelengths (i.e. signals of higher frequencies) will have less samples, and therefore you might say, a more poorly represented wavelength. Lower frequency signals on the other hand will have more samples of their wavelengths, making them better represented so to speak.
@@ -24,6 +24,7 @@ One important note is that, because the wavtable is used for calculation, the am
 ## programming tips
 * when shrinking or expanding a wav file, in the header, only the byid and glen (actually byid+36) member need be changed, which happily is not much.
 * using fread() on a wav file means loading the data into unsigned, as opposed to signed, char types.
+* with fwrite() you need not bother about unsigned chars ... because fwrite() will convert from shorts to small-endian bytes itself.
 
 ## Program listing
 * wnums: helper function to print out the numeric values according to a 100 sample point starting from a specific point in a wav file
