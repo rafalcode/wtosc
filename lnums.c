@@ -12,6 +12,10 @@
 /* hardcoded number of samples */
 #define NCSAMPS 100 /*  A channel sample is a sample from one channel */
 typedef unsigned char boole;
+typedef struct /* da_t: data analysis type: just grouping interesting data in one struct */
+{
+    short mx; /* no point asking for min value in sound */
+} da_t; 
 typedef struct /* time point, tpt */
 {
     int m, s, h;
@@ -114,7 +118,7 @@ int hdrchk(wh_t *inhdr)
     return 0;
 }
 
-void prttheshorts(wht_t *twhdr, short *vals)
+void prttheshorts(wh_t *twhdr, short *vals)
 {
     int i;
     int byidasshort=twhdr->byid/2;
@@ -136,7 +140,7 @@ void prttheshorts(wht_t *twhdr, short *vals)
     return;
 }
 
-short *w2shorts(char *inwf, wh_t *inhdr) /* w2shorts: return an array of shorts which is the data in the wav file. */
+short *w2shorts(char *inwf, wh_t *inhdr, da_t *da) /* w2shorts: return an array of shorts which is the data in the wav file. */
 {
     FILE *inwavfp=fopen(inwf,"rb");
     if ( inwavfp == NULL ) {
@@ -165,6 +169,8 @@ short *w2shorts(char *inwf, wh_t *inhdr) /* w2shorts: return an array of shorts 
         ii=i/2;
         vals[ii]=((short)bf[i+1])<<8; /* will also set lower bytes to zero */
         vals[ii] |=(short)bf[i];
+        if(vals[ii] >da->mx)
+            da->mx=vals[ii];
     }
     free(bf);
 
@@ -173,14 +179,15 @@ short *w2shorts(char *inwf, wh_t *inhdr) /* w2shorts: return an array of shorts 
 
 int main(int argc, char *argv[])
 {
-    if(argc != 3) {
-        printf("Usage: calcs hits of a certain level: Args: 1) Name of wavfile 2) level (short up ro 32k or there abouts).\n");
+    if( argc != 3) {
+        printf("Usage: calcs hits of a certain level: Args: 1) Name of wavfile 2) %% of mx to use as level.\n");
         exit(EXIT_FAILURE);
     }
     int i;
+    da_t da={0}; /* our data analysis type */
 
     wh_t *twhdr=malloc(sizeof(wh_t)); /* empty as yet */
-    short *vals=w2shorts(argv[1], twhdr); /* in this call, twhdr gets set */
+    short *vals=w2shorts(argv[1], twhdr, &da); /* in this call, twhdr gets set */
     int byidasshort=twhdr->byid/2;
 
 #ifdef DBG2
@@ -188,7 +195,7 @@ int main(int argc, char *argv[])
 #endif
     boole uphit=0;
     unsigned hitlu=0, hitld=0; /* hit level up, hit level down */
-    short l0=(short)atoi(argv[2]);
+    short l0=(short)(.5+atof(argv[2])*da.mx);
 #ifdef DBG
     if(twhdr->nchans ==2) {
         for(i=0;i<byidasshort; i+=2)
@@ -213,6 +220,9 @@ int main(int argc, char *argv[])
     }
     printf("\n"); 
 #endif
+//     for(i=0;i<byidasshort; i++)
+
+    printf("Max short = %hd\n", da.mx);
     printf("#hit level upwards %u times. hit level downwards %u times.\n", hitlu, hitld); 
 
     free(twhdr);
