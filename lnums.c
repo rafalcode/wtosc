@@ -6,12 +6,33 @@
 #include <string.h>
 
 #define MXINTV 0x7FFFFFFF /* max int value */
-
 #define ARBSZ 128
-
+#define GBUF 8
 /* hardcoded number of samples */
 #define NCSAMPS 100 /*  A channel sample is a sample from one channel */
+
+#define CONDREALLOC2(x, b, c, a1, t1); \
+    if((x)==((b)-1)) { \
+        (b) += (c); \
+        (a1)=realloc((a1), (b)*sizeof(t1)); \
+        memset((a1)+(b)-(c), '\0', (c)*sizeof(t1)); \
+    }
+
 typedef unsigned char boole;
+
+typedef struct /* short occurences */
+{
+    short sa; /* array of shorts */
+    unsigned oca; /* occurence counts (of the shorts) array */
+} shocs_t;
+
+typedef struct /* holder for shocs_t: occurence arrayr */
+{
+    unsigned b; /* buffer for our shorts array */
+    unsigned n; /* actual size */
+    shocs_t *a; /* occurence counts (of the shorts) array */
+} shoca_t;
+
 typedef struct /* da_t: data analysis type: just grouping interesting data in one struct */
 {
     short mx; /* no point asking for min value in sound */
@@ -21,7 +42,7 @@ typedef struct /* time point, tpt */
     int m, s, h;
 } tpt;
 
-typedef struct
+typedef struct /* wh_t */
 {
     char id[4]; // should always contain "RIFF"
     int glen;    // general length: total file length minus 8, could because the types so far seen (id and glen itself) are actually 8 bytes
@@ -37,22 +58,73 @@ typedef struct
     int byid; // BYtes_In_Data;
 } wh_t; /* wav header type */
 
-wh_t *hdr4chunk(int sfre, char nucha, int certainsz) /* a header for a file chunk of certain siez */
+static int cmpsa(const void *p1, const void *p2)
 {
-    wh_t *wh=malloc(sizeof(wh_t));
-    strncpy(wh->id, "RIFF", 4);
-    strncpy(wh->fstr, "WAVEfmt ", 8);
-    strncpy(wh->datastr, "data", 4);
-    wh->fmtnum=16;
-    wh->pcmnum=1;
-    wh->nchans=nucha; /* fed in to function */
-    wh->sampfq=sfre; /* fed in to function */
-    wh->glen=certainsz-8;
-    wh->bipsamp=16;
-    wh->bypc=wh->bipsamp/8;
-    wh->byps=wh->nchans*wh->sampfq*wh->bypc;
-    wh->byid=wh->glen-36;
-    return wh;
+    int ret;
+    shocs_t *x1=(shocs_t*)p1;
+    shocs_t *x2=(shocs_t*)p2;
+    if(x1->sa < x2->sa)
+        ret=1;
+    else if(x1->sa == x2->sa)
+        ret = 0;
+    else
+        ret=-1;
+    return ret;
+}
+
+void prtshoca(shoca_t *sha)
+{
+    int j;
+    printf("number of different sequence lengths: %u\n", sha->n);
+    printf("vals: "); 
+    for(j=0; j<sha->n;++j)
+        printf("%5u ", sha->a[j].sa);
+    printf("\n"); 
+    printf("ocs: "); 
+    for(j=0; j<sha->n;++j)
+        printf("%5u ", sha->a[j].oca);
+    printf("\n"); 
+    return;
+}
+
+shoca_t *uniquelens(short *vals, unsigned byidasshort)
+{
+    boole new;
+    unsigned i, j;
+    unsigned asz=0;
+    shoca_t *sha=malloc(sizeof(shoca_t));
+    sha->b=GBUF;
+    sha->a=calloc(sha->b, sizeof(shocs_t));
+    for(i=0; i<byidasshort;++i) {
+        new=1;
+        for(j=0; j<asz;++j) {
+            if(sha->a[j].sa == vals[i]) {
+                sha->a[j].oca++;
+                new=0;
+                break;
+            }
+        }
+        if(new) {
+            CONDREALLOC2(asz, sha->b, GBUF, sha->a, shocs_t);
+            sha->a[asz].sa=vals[i];
+            sha->a[asz].oca++;
+            asz++;
+        }
+    }
+#ifdef DBG
+    printf("number of different sequence lengths: %u\n", asz);
+    printf("vals: "); 
+    for(j=0; j<asz;++j)
+        printf("%5u ", sha->a[j].sa);
+    printf("\n"); 
+    printf("ocs: "); 
+    for(j=0; j<asz;++j)
+        printf("%5u ", sha->a[j].oca);
+    printf("\n"); 
+#endif
+    sha->n=asz;
+    sha->a=realloc(sha->a, asz*sizeof(shocs_t));
+    return sha;
 }
 
 int hdrchk(wh_t *inhdr)
@@ -196,7 +268,7 @@ int main(int argc, char *argv[])
     boole uphit=0;
     unsigned hitlu=0, hitld=0; /* hit level up, hit level down */
     short l0=(short)(.5+atof(argv[2])*da.mx);
-#ifdef DBG
+#ifdef DBG2
     if(twhdr->nchans ==2) {
         for(i=0;i<byidasshort; i+=2)
             if( (uphit==0) & ((vals[i] >= l0) | (vals[i+1] >= l0)) ) {
@@ -220,7 +292,14 @@ int main(int argc, char *argv[])
     }
     printf("\n"); 
 #endif
-//     for(i=0;i<byidasshort; i++)
+    shoca_t *sha=uniquelens(vals, byidasshort);
+#ifdef DBG
+    prtshoca(sha);
+    qsort(sha->a, sha->n, sizeof(shocs_t), cmpsa);
+#endif
+#ifdef DBG
+    prtshoca(sha);
+#endif
 
     printf("Max short = %hd\n", da.mx);
     printf("#hit level upwards %u times. hit level downwards %u times.\n", hitlu, hitld); 
