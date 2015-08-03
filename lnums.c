@@ -63,7 +63,7 @@ static int cmpsa(const void *p1, const void *p2)
     int ret;
     shocs_t *x1=(shocs_t*)p1;
     shocs_t *x2=(shocs_t*)p2;
-    if(x1->sa < x2->sa)
+    if(x1->sa > x2->sa)
         ret=1;
     else if(x1->sa == x2->sa)
         ret = 0;
@@ -72,17 +72,22 @@ static int cmpsa(const void *p1, const void *p2)
     return ret;
 }
 
+void prttopshoca(shoca_t *sha, unsigned top)
+{
+    int j;
+    printf("top valuesand their occurences (shortval:occurences): %u\n", sha->n);
+    for(j=sha->n-1; j>=sha->n-top;--j)
+        printf("%hd:%u ", sha->a[j].sa, sha->a[j].oca);
+    printf("\n"); 
+    return;
+}
+
 void prtshoca(shoca_t *sha)
 {
     int j;
-    printf("number of different sequence lengths: %u\n", sha->n);
-    printf("vals: "); 
+    printf("number of different sequence lengths (shortval:occurences): %u\n", sha->n);
     for(j=0; j<sha->n;++j)
-        printf("%5u ", sha->a[j].sa);
-    printf("\n"); 
-    printf("ocs: "); 
-    for(j=0; j<sha->n;++j)
-        printf("%5u ", sha->a[j].oca);
+        printf("%hd:%u ", sha->a[j].sa, sha->a[j].oca);
     printf("\n"); 
     return;
 }
@@ -96,6 +101,8 @@ shoca_t *uniquelens(short *vals, unsigned byidasshort)
     sha->b=GBUF;
     sha->a=calloc(sha->b, sizeof(shocs_t));
     for(i=0; i<byidasshort;++i) {
+        if(vals[i]<=0)
+            continue;
         new=1;
         for(j=0; j<asz;++j) {
             if(sha->a[j].sa == vals[i]) {
@@ -294,16 +301,16 @@ int main(int argc, char *argv[])
 #endif
     shoca_t *sha=uniquelens(vals, byidasshort);
 #ifdef DBG
-    prtshoca(sha);
     qsort(sha->a, sha->n, sizeof(shocs_t), cmpsa);
+    prttopshoca(sha, 100);
 #endif
-#ifdef DBG
-    prtshoca(sha);
-#endif
+    printf("unique +ve amplitude values: %u\n", sha->n); 
 
     printf("Max short = %hd\n", da.mx);
     printf("#hit level upwards %u times. hit level downwards %u times.\n", hitlu, hitld); 
 
+    free(sha->a);
+    free(sha);
     free(twhdr);
     free(vals);
     return 0;
