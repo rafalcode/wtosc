@@ -174,6 +174,7 @@ int main(int argc, char *argv[])
     unsigned iwtsamps=(unsigned)(.5+wtsamps); /* integer number of samples for our wavetable */
     wavt_t *wt=malloc(iwtsamps*sizeof(wavt_t)); /* wv_t is just ine element ... the full wavetable needs to be an array */
     float wtstpsz=2.*M_PI/(float)iwtsamps; /* the increment size ... yes it can be a float */
+
     /*OK create the wavetable */
     for(i=0;i<iwtsamps;i+=1) {
         wt[i].assocfl =wtstpsz*i;
