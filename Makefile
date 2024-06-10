@@ -1,7 +1,8 @@
 CC=gcc
 CFLAGS=-g -Wall
+SPECLIBS=-lcairo -lm
 
-EXECUTABLES=symyf symymf wsymymf wsymymf_d wnums wnums_d lnums
+EXECUTABLES=symyf symymf wsymymf wsymymf_d wnums wnums_d lnums seerold gwa wtout wtbank0 gri1
 
 # symyf: SYnthesise MY Frequency. Accepts a frequency vlaue on the command line, and synthesizes a sine wave on it, using a wavetable.
 symyf: symyf.c
@@ -13,6 +14,14 @@ symyf: symyf.c
 # indicating the number of sample points in the ring.
 symymf: symymf.c
 	${CC} ${CFLAGS} $^ -o $@ -lm
+gwa: gwa.c
+	${CC} ${CFLAGS} $^ -o $@ -lm
+wtout: wtout.c
+	${CC} ${CFLAGS} $^ -o $@ -lm
+# wtbank0 base on seerold.c
+# # does same thing, but it's been robustified
+wtbank0: wtbank0.c
+	${CC} ${CFLAGS} -o $@ $^ ${SPECLIBS} -lm
 
 # prototype for reading in a data from a wav file from a certain time point: used later in wsymymf.c
 samh: samh.c
@@ -44,6 +53,9 @@ wsymymf: wsymymf.c
 # wsymymf_d: need the debug version to discover where the distortion is coming from
 wsymymf_d: wsymymf.c
 	${CC} ${CFLAGS} -DDBG $^ -o $@
+
+gri1: gri1.c
+	${CC} ${CFLAGS} -o $@ $^ ${SPECLIBS} -lm
 
 .PHONY: clean
 
