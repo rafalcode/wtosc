@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-g -Wall
 SPECLIBS=-lcairo -lm
 
-EXECUTABLES=sy0 symyf symymf wsymymf wsymymf_d wnums wnums_d lnums seerold gwa gwa2 wtout wtout2 wtbank0 gri1 sinevals tsinevals natf svs0 gwa3
+EXECUTABLES=sy0 symyf symymf wsymymf wsymymf_d wnums wnums_d lnums seerold gwa gwa2 wtout wtout2 wtbank0 gri1 sinevals tsinevals natf svs0 gsinxtra
 
 # symyf: SYnthesise MY Frequency. Accepts a frequency vlaue on the command line, and synthesizes a sine wave on it, using a wavetable.
 symyf: symyf.c
@@ -29,8 +29,9 @@ gwa2: gwa2.c
 	${CC} ${CFLAGS} $^ -o $@ -lm
 gwa2_d: gwa2.c
 	${CC} ${CFLAGS} -DDBG $^ -o $@ -lm
-# a multiharmonic version of gwa2
-gwa3: gwa3.c
+# a multiharmonic version of gwa2, was gwa3, now gsinxtra, i.e. Generate SINe eXTRA
+# because you can also add harmonics (i.e. tending to sawtooth).
+gsinxtra: gsinxtra.c
 	${CC} ${CFLAGS} $^ -o $@ -lm
 wtout: wtout.c
 	${CC} ${CFLAGS} $^ -o $@ -lm
