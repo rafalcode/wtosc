@@ -15,6 +15,10 @@ In quite convenient fashion, the wavetable approach turns out to be ideal for a 
 
 # Implementation
 
+## Naming
+I'm having trouble with assocfl. Clearly this is aossciated float, but doesn't it refer to x axiz which is radians? It would be preferable to have assocrfl instead then or find something other can assoc
+which seems very clumsy
+
 ## Three stages
 There are three broad stages. The first is building up the wavetable based on a certain "Model" frequency". The second is where we take an arbitrary frequency and generate a ring structure of amplitude values calculated from the wavtable. The third and final stage is cycling through the ring structure a number of times for each frequency if there is nore than one, and outputting these values into a wav file.
 
@@ -31,3 +35,28 @@ One important note is that, because the wavtable is used for calculation, the am
 * symyf: compile with "make symyf" proof-of-concept wavetable. One sinewave frequency synthesised to a wav file.
 * symymf: compile with "make symymf" Eight frequencies sythesised from a sine wavetable
 * wsymymf: compile with "make wsymymf". Allows waveform to be sampled from a wavfile at a certain point. Eight frequencies sythesised.
+
+# Revisiting June 2024
+at first glance these thigns come out:
+- wtosc is really about getting a single uniform sound and generating it in different frequencies. So it's not really about creating a continuous sound from a tiny sample of that sound. 
+- wsymymf is a horrible name
+- having to give the number of samples to take is a tricky one, you need a helper function to show how many samples are available.
+
+# wtout.c
+THis takes a wavtable wav file such as those at https://waveeditonline.com/index.html
+and allows you to choose one of the 256-valued wavtabes in there and generate a second or two worht of it.
+However I'm still not sure if it's correct. They all sound surprisingly the same, which can;t be right. However I checked on audacity
+and they do seem to comply ... not sure what's going on.
+
+wtout2.c would seem to be more useful. It can output either a wav or a text file with the values.
+
+# gsinxtra.c
+this is a more capable wavtable sine generator. It focuses on the number of samples that a wavable might contain. It allows the adition of the n harmonics (which would lead to a sawtooth)
+anmd allows output to text (i.e. the shorts) or a wav file.
+
+# Links
+* https://www.musicradar.com/news/ultimate-guide-wavetable-synthesis
+Gary Scavone of McGill, some terminology a bit lumsy, especially "phase" which he calims is table index, or the index of the sample in the table.
+* https://www.music.mcgill.ca/~gary/307/index.html#Outline
+
+
